@@ -21,8 +21,7 @@ Private Sub DbInitialized
 	End If
 End Sub
 
-
-Sub ParseArticleJson
+Sub ParseArticleJson as ResumableSub
 	DbInitialized
 	
 	Dim strArtJson As String = File.ReadString(File.DirAssets, "artikel.json")
@@ -60,13 +59,33 @@ Sub ParseArticleJson
 
 	Starter.sql.TransactionSuccessful
 	Starter.sql.EndTransaction
-	Log("DONE importing articles")
+	Return True
 End Sub
-	
 
 Sub GetArticleCount As Int
 	DbInitialized
 	
 	qry = $"select count(article_number) as count from article"$
 	Return Starter.sql.ExecQuerySingleResult(qry)
+End Sub
+
+Sub GetUnknownEanCount As Int
+	DbInitialized
+	
+	qry = $"select count(id) as count from ean_not_found"$
+	Return Starter.sql.ExecQuerySingleResult(qry)
+End Sub
+
+Sub PurgeArticleTable As ResumableSub
+	DbInitialized
+	
+	qry = $"DELETE FROM article"$
+	Starter.sql.ExecNonQuery(qry)
+	'clean db space
+	vacuumDB
+	Return True
+End Sub
+
+Private Sub vacuumDB
+	Starter.sql.ExecNonQuery("VACUUM")
 End Sub

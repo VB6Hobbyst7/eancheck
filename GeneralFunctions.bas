@@ -148,9 +148,9 @@ Public Sub AppTitle(textSize As Int, zegrisColor As Int) As CSBuilder
 End Sub
 
 Sub createCustomToast(txt As String, color As String)
-'	Dim cs As CSBuilder
-'	cs.Initialize.Typeface(Typeface.LoadFromAssets("Arial.ttf")).Color(Colors.White).Size(16).Append(txt).PopAll
-'	ShowCustomToast(cs, False, color)
+	Dim cs As CSBuilder
+	cs.Initialize.Typeface(Typeface.LoadFromAssets("Arial.ttf")).Color(Colors.White).Size(16).Append(txt).PopAll
+	ShowCustomToast(cs, False, color)
 End Sub
 
 Sub ShowCustomToast(Text As Object, LongDuration As Boolean, BackgroundColor As Int)

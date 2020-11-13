@@ -1,12 +1,16 @@
-﻿Build1=Default,b4a.example
-File1=artikel.json
-File2=eancheck.db
-File3=Main.bal
-File4=materialdesignicons-webfont.ttf
+﻿Build1=Default,nl.pdeg.eancheck
+File1=arial.ttf
+File2=artikel.json
+File3=eancheck.db
+File4=eancheck.png
+File5=Main.bal
+File6=materialdesignicons-webfont.ttf
 FileGroup1=Default Group
 FileGroup2=Default Group
 FileGroup3=Default Group
 FileGroup4=Default Group
+FileGroup5=Default Group
+FileGroup6=Default Group
 Group=Default Group
 Library1=core
 Library10=runtimepermissions
@@ -27,7 +31,7 @@ Module3=GeneralFunctions
 Module4=GetScanner
 Module5=ImportArticleJson
 Module6=Starter
-NumberOfFiles=4
+NumberOfFiles=6
 NumberOfLibraries=12
 NumberOfModules=6
 Version=10.2
@@ -35,7 +39,7 @@ Version=10.2
 #Region  Project Attributes 
 	#ApplicationLabel: EAN Checker
 	#VersionCode: 1
-	#VersionName: 0.01
+	#VersionName: 0.12
 	'SupportedOrientations possible values: unspecified, landscape or portrait.
 	#SupportedOrientations: portrait
 	#CanInstallToExternalStorage: False
@@ -53,18 +57,22 @@ End Sub
 
 Sub Globals
 	'These global variables will be redeclared each time the activity is created.
+	Private clsFunc As GeneralFunctions
 	Private clsDb As DbFunctions
 	Private clvUnknownEan As CustomListView
 	Private pnlImport As Panel
+	Private lblHeader As Label
+	Private lblEanMissing As Label
 End Sub
 
 Sub Activity_Create(FirstTime As Boolean)
 	CheckIfDbExists
 	clsImportJson.Initialize
 	clsDb.Initialize
+	clsFunc.Initialize
 	Activity.LoadLayout("Main")
-	
-	clsDb.GetArticleCount
+	lblHeader.Text = $"EAN Controle v${Application.VersionName}"$
+	ShowEanTotalAndNotFound
 End Sub
 
 Sub Activity_Resume
@@ -75,21 +83,30 @@ Sub Activity_Pause (UserClosed As Boolean)
 
 End Sub
 
+Sub ShowEanTotalAndNotFound
+	lblEanMissing.Text = $"Ean ${clsDb.GetArticleCount} waarvan ${clsDb.GetUnknownEanCount} onbekend"$
+End Sub
+
 Sub CheckIfDbExists
 	If File.Exists(Starter.filePath, "eancheck.db") = False Then
 		File.Copy(File.DirAssets, "eancheck.db", Starter.filePath, "eancheck.db")
 	End If
 End Sub
 
-
 Sub pnlImport_Click
 	If clsDb.GetArticleCount > 0 Then
-		Msgbox2Async("Artikel tabel is niet leeg, door gaan met importeren", "Artikelen importeren", "Ja", "", "Nee", Null, False)
+		Msgbox2Async("Artikel tabel is niet leeg, door gaan met importeren", "Artikelen importeren", "Ja", "", "Nee", Application.Icon, False)
 		Wait For Msgbox_Result (Result As Int)
-		If Result = DialogResponse.NEGATIVE Then
-			Return
+		If Result = DialogResponse.POSITIVE Then
+			ProgressDialogShow2("Artikelen bijwerken..", False)
+			Sleep(300)
+			Wait For (clsDb.PurgeArticleTable) Complete (done As Boolean)
+			ProgressDialogHide
 		End If
 	End If
-
-	clsDb.ParseArticleJson
+	Wait For (clsDb.ParseArticleJson) Complete (done As Boolean)
+	
+	clsFunc.createCustomToast("Artikelen geïmporteerd", Colors.Blue)
+	Sleep(100)
+	ShowEanTotalAndNotFound
 End Sub
