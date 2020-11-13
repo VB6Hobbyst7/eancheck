@@ -1,0 +1,95 @@
+﻿Build1=Default,b4a.example
+File1=artikel.json
+File2=eancheck.db
+File3=Main.bal
+File4=materialdesignicons-webfont.ttf
+FileGroup1=Default Group
+FileGroup2=Default Group
+FileGroup3=Default Group
+FileGroup4=Default Group
+Group=Default Group
+Library1=core
+Library10=runtimepermissions
+Library11=json
+Library12=sql
+Library2=xui
+Library3=jmqtt
+Library4=randomaccessfile
+Library5=audio
+Library6=serial
+Library7=xui views
+Library8=phone
+Library9=accessibility
+ManifestCode='This code will be applied to the manifest file during compilation.~\n~'You do not need to modify it in most cases.~\n~'See this link for for more information: https://www.b4x.com/forum/showthread.php?p=78136~\n~AddManifestText(~\n~<uses-sdk android:minSdkVersion="14" android:targetSdkVersion="29"/>~\n~<supports-screens android:largeScreens="true" ~\n~    android:normalScreens="true" ~\n~    android:smallScreens="true" ~\n~    android:anyDensity="true"/>)~\n~SetApplicationAttribute(android:icon, "@drawable/icon")~\n~SetApplicationAttribute(android:label, "$LABEL$")~\n~CreateResourceFromFile(Macro, Themes.LightTheme)~\n~'End of default text.~\n~
+Module1=ClassMqtt
+Module2=DbFunctions
+Module3=GeneralFunctions
+Module4=GetScanner
+Module5=ImportArticleJson
+Module6=Starter
+NumberOfFiles=4
+NumberOfLibraries=12
+NumberOfModules=6
+Version=10.2
+@EndOfDesignText@
+#Region  Project Attributes 
+	#ApplicationLabel: EAN Checker
+	#VersionCode: 1
+	#VersionName: 0.01
+	'SupportedOrientations possible values: unspecified, landscape or portrait.
+	#SupportedOrientations: portrait
+	#CanInstallToExternalStorage: False
+#End Region
+
+#Region  Activity Attributes 
+	#FullScreen: False
+	#IncludeTitle: False
+#End Region
+
+Sub Process_Globals
+	Private xui As XUI
+	Private clsImportJson As ImportArticleJson
+End Sub
+
+Sub Globals
+	'These global variables will be redeclared each time the activity is created.
+	Private clsDb As DbFunctions
+	Private clvUnknownEan As CustomListView
+	Private pnlImport As Panel
+End Sub
+
+Sub Activity_Create(FirstTime As Boolean)
+	CheckIfDbExists
+	clsImportJson.Initialize
+	clsDb.Initialize
+	Activity.LoadLayout("Main")
+	
+	clsDb.GetArticleCount
+End Sub
+
+Sub Activity_Resume
+
+End Sub
+
+Sub Activity_Pause (UserClosed As Boolean)
+
+End Sub
+
+Sub CheckIfDbExists
+	If File.Exists(Starter.filePath, "eancheck.db") = False Then
+		File.Copy(File.DirAssets, "eancheck.db", Starter.filePath, "eancheck.db")
+	End If
+End Sub
+
+
+Sub pnlImport_Click
+	If clsDb.GetArticleCount > 0 Then
+		Msgbox2Async("Artikel tabel is niet leeg, door gaan met importeren", "Artikelen importeren", "Ja", "", "Nee", Null, False)
+		Wait For Msgbox_Result (Result As Int)
+		If Result = DialogResponse.NEGATIVE Then
+			Return
+		End If
+	End If
+
+	clsDb.ParseArticleJson
+End Sub
