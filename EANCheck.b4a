@@ -5,12 +5,14 @@ File3=eancheck.db
 File4=eancheck.png
 File5=Main.bal
 File6=materialdesignicons-webfont.ttf
-FileGroup1=Default Group
-FileGroup2=Default Group
-FileGroup3=Default Group
-FileGroup4=Default Group
-FileGroup5=Default Group
-FileGroup6=Default Group
+File7=pnlUnknownEAN.bal
+FileGroup1=files
+FileGroup2=files
+FileGroup3=files
+FileGroup4=files
+FileGroup5=Forms
+FileGroup6=files
+FileGroup7=Forms
 Group=Default Group
 Library1=core
 Library10=runtimepermissions
@@ -31,7 +33,7 @@ Module3=GeneralFunctions
 Module4=GetScanner
 Module5=ImportArticleJson
 Module6=Starter
-NumberOfFiles=6
+NumberOfFiles=7
 NumberOfLibraries=12
 NumberOfModules=6
 Version=10.2
@@ -39,7 +41,7 @@ Version=10.2
 #Region  Project Attributes 
 	#ApplicationLabel: EAN Checker
 	#VersionCode: 1
-	#VersionName: 0.12
+	#VersionName: 0.15
 	'SupportedOrientations possible values: unspecified, landscape or portrait.
 	#SupportedOrientations: portrait
 	#CanInstallToExternalStorage: False
@@ -51,28 +53,68 @@ Version=10.2
 #End Region
 
 Sub Process_Globals
+	Type productData(id As String, articleNr As String, ean1 As String, ean2 As String, ean3 As String, _
+					 descr As String, pack As String, alfa As String, statie As String)
 	Private xui As XUI
 	Private clsImportJson As ImportArticleJson
+	dim beep as Beeper
 End Sub
 
 Sub Globals
 	'These global variables will be redeclared each time the activity is created.
 	Private clsFunc As GeneralFunctions
 	Private clsDb As DbFunctions
+	Private clsScanner As GetScanner
 	Private clvUnknownEan As CustomListView
 	Private pnlImport As Panel
 	Private lblHeader As Label
 	Private lblEanMissing As Label
+	Private lblArtNr As Label
+	Private lblEan1 As Label
+	Private lblEan2 As Label
+	Private lblEan3 As Label
+	Private lblOms As Label
+	Private pnlEan As Panel
+	Private lblPack As Label
+	Private pnlEanMissing As Panel
+	Private pnlTestEan As Panel
 End Sub
 
 Sub Activity_Create(FirstTime As Boolean)
 	CheckIfDbExists
-	clsImportJson.Initialize
-	clsDb.Initialize
-	clsFunc.Initialize
+	InitClasses
+	
 	Activity.LoadLayout("Main")
 	lblHeader.Text = $"EAN Controle v${Application.VersionName}"$
 	ShowEanTotalAndNotFound
+	clvUnknownEan.Clear
+	
+	'GetConnected Devices
+	InitScanner
+End Sub
+
+Private Sub InitClasses
+	clsImportJson.Initialize
+	clsDb.Initialize
+	clsFunc.Initialize
+	clsScanner.Initialize("Main")
+End Sub
+
+Sub InitScanner
+	clsScanner.serial1.Initialize("Serial")
+	clsScanner.TimeGetDevice.Initialize("timerDeviceDone", 2000)
+	clsScanner.ShowPairedDevices
+	If clsScanner.ScannerOnceConnected=True Then
+		clsScanner.TimeGetDevice.Enabled=True
+		clsFunc.createCustomToast("Scanner verbonden", Colors.Blue)
+	Else
+		clsFunc.createCustomToast("Scanner niet gevonden", Colors.red)
+	End If
+End Sub
+
+Sub ScannerFound(found As Boolean)
+	clsFunc.createCustomToast("Scanner verbonden", Colors.Blue)
+	
 End Sub
 
 Sub Activity_Resume
@@ -110,3 +152,101 @@ Sub pnlImport_Click
 	Sleep(100)
 	ShowEanTotalAndNotFound
 End Sub
+
+Sub GenClvItem(prodData As productData)
+	If checkItemInList(prodData.id) Then Return
+	
+	Dim p As B4XView = xui.CreatePanel("")
+	p.SetLayoutAnimated(0, 0dip, 0dip, clvUnknownEan.AsView.Width, 220dip)
+	p.LoadLayout("pnlUnknownEAN")
+	p.Tag = prodData.id
+	
+	lblArtNr.Text = prodData.articleNr
+	lblEan1.Text = prodData.ean1
+	lblEan2.Text = prodData.ean2
+	lblEan3.Text = prodData.ean3
+	lblOms.Text = prodData.descr
+	lblPack.Text = prodData.pack
+	
+	clvUnknownEan.Add(p, "")
+		
+End Sub
+
+Sub checkItemInList(id As String) As Boolean
+	Dim p As Panel
+	For i = 0 To clvUnknownEan.Size - 1
+		p = clvUnknownEan.GetPanel(i)
+		If p.Tag = id Then
+			beep.Initialize(250, 2500)
+			
+			Return True
+		End If
+	Next
+	Return False
+End Sub
+
+'INTERNAL JONGENS CODE IS 7 CHARACTERS LOG
+Sub ProcessScannedCode(scannedCode As String)
+	
+	Dim isJongens As Boolean = scannedCode.Length = 7
+		
+	If isJongens Then
+		findJongensCode(scannedCode)
+	Else
+		findProuctCode(scannedCode)
+	End If
+	
+'	DetermineCodeFound
+End Sub
+
+Sub DetermineCodeFound
+	Dim lst As List = clsDb.GetUnknownEanData'ignore
+	GenClvItem(lst.Get(0))
+	lblEanMissing.Text = $"Ean ${clsDb.GetArticleCount} waarvan ${clvUnknownEan.Size} onbekend"$
+	
+End Sub
+
+Sub findJongensCode(code As String)
+	Starter.firstCodeScanned = code
+	Dim firstFound As Int = clsDb.ProcessScannedCode(True)
+	If firstFound = 1 Then
+		Starter.eanJongensFound = True
+		Starter.scannedJongensCode = code
+		clsFunc.createCustomToast($"Jongens code GEVONDEN"$, Colors.Blue)
+	End If
+End Sub
+
+Sub findProuctCode(code As String)
+	Starter.firstCodeScanned = code
+	Dim isFound As Int = clsDb.ProcessScannedCode(False)
+	If isFound = 1 Then
+		Starter.eanProductFound = True
+		Starter.scannedProductCode = code
+		clsFunc.createCustomToast($"Product code GEVONDEN"$, Colors.Blue)
+	End If
+End Sub
+
+Sub clearScanSearchVars
+	Starter.eanProductFound = False
+	Starter.eanJongensFound = False
+	Starter.scannedJongensCode = ""
+	Starter.scannedProductCode = ""
+	Starter.firstCodeScanned = ""
+	Starter.secondCodeScanned = ""
+End Sub
+
+Sub pnlTestEan_Click
+	Dim sTime As Long = DateTime.Now
+	clearScanSearchVars
+	ProcessScannedCode("5449000228354")'2
+	ProcessScannedCode("0101634")
+	If Starter.eanJongensFound = False Or Starter.eanProductFound = False Then
+		DetermineCodeFound
+	End If
+	
+	Log($"Codes gevonden in ${DateTime.Now-sTime}ms"$)
+End Sub
+
+'Starter.secondCodeScanned = "5449000228352" '2
+	'	Starter.secondCodeScanned = "0101634" '2
+

@@ -14,7 +14,9 @@ Sub Process_Globals
 	Public const port As Int = 1883
 	Public const host As String = "pdeg3005.mynetgear.com"
 	Public filePath As String
-	Public scannerMac As String
+	Public scannerMac, firstCodeScanned, secondCodeScanned As String
+	Public testSecondCode, eanJongensFound, eanProductFound As Boolean
+	Public scannedJongensCode, scannedProductCode As String
 	Dim sql As SQL
 End Sub
 
