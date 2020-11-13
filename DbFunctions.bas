@@ -21,7 +21,7 @@ Private Sub DbInitialized
 	End If
 End Sub
 
-Sub ParseArticleJson as ResumableSub
+Sub ParseArticleJson As ResumableSub
 	DbInitialized
 	
 	Dim strArtJson As String = File.ReadString(File.DirAssets, "artikel.json")
@@ -88,4 +88,54 @@ End Sub
 
 Private Sub vacuumDB
 	Starter.sql.ExecNonQuery("VACUUM")
+End Sub
+
+Sub ProcessScannedCode(isJongens As Boolean) As Int
+	DbInitialized
+	
+	If isJongens Then
+		qry = "SELECT count(id) FROM article WHERE article_number = ?"
+		Return Starter.sql.ExecQuerySingleResult2(qry, Array As String(Starter.firstCodeScanned))
+	Else
+		qry = "SELECT count(id) FROM article WHERE article_number = ? Or (ean_1 = ? Or ean_2 = ? Or ean_3 = ?)"
+		Return Starter.sql.ExecQuerySingleResult2(qry, Array As String(Starter.firstCodeScanned, Starter.firstCodeScanned, Starter.firstCodeScanned, Starter.firstCodeScanned))
+	End If
+End Sub
+
+Sub GetUnknownEanData As List
+	DbInitialized
+	Dim lst As List
+	
+	If Starter.scannedJongensCode.Length > 0 Then
+		qry = $"SELECT * FROM article where article_number = ?"$
+		rs = Starter.sql.ExecQuery2(qry, Array As String(Starter.scannedJongensCode))
+	End If
+	
+	If Starter.scannedProductCode.Length > 0 Then
+		qry = $"SELECT * FROM article where (ean_1 = ? or ean_2 = ? or ean_3 = ?)"$
+		rs = Starter.sql.ExecQuery2(qry, Array As String(Starter.scannedProductCode, Starter.scannedProductCode, Starter.scannedProductCode))
+	End If
+	lst.Initialize
+	
+	Do While rs.NextRow
+		lst.Add(CreateproductData(rs.GetString("id"), rs.GetString("article_number"), rs.GetString("ean_1"), rs.GetString("ean_2"), rs.GetString("ean_3"), rs.GetString("description"), rs.GetString("pack"), rs.GetString("alfa"), rs.GetString("statie")))
+	Loop
+	
+	rs.close
+	Return lst
+End Sub
+
+Public Sub CreateproductData (id As String, articleNr As String, ean1 As String, ean2 As String, ean3 As String, descr As String, pack As String, alfa As String, statie As String) As productData
+	Dim t1 As productData
+	t1.Initialize
+	t1.id = id
+	t1.articleNr = articleNr
+	t1.ean1 = ean1
+	t1.ean2 = ean2
+	t1.ean3 = ean3
+	t1.descr = descr
+	t1.pack = pack
+	t1.alfa = alfa
+	t1.statie = statie
+	Return t1
 End Sub

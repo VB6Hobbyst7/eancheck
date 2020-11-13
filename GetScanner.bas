@@ -36,7 +36,7 @@ Sub Class_Globals
 	Dim clsFunc As GeneralFunctions
 	Dim serial1 As Serial
 	Dim AStream As AsyncStreams
-	Dim T As Timer
+	Dim TimeGetDevice As Timer
 	Dim ScannerMacAddress As String
 	Dim ScannerOnceConnected As Boolean
 	Dim maxTriesToConnect As Int = 0
@@ -86,12 +86,12 @@ Sub ShowPairedDevices
 	If res <> DialogResponse.CANCEL Then
 		If deviceList.Get(res) = noDevice Or deviceList.Get(res) = selectNoScanner Then
 			Starter.scannerMac = ""
-			T.Enabled = False
+			TimeGetDevice.Enabled = False
 			serial1.Disconnect
 			AStream.Close
 			Return
 		Else
-			T.Initialize("Timer", 2000)
+			TimeGetDevice.Initialize("Timer", 2000)
 			'TRY TO CONNECT TO THE SELECTED DEVICE
 			ScannerMacAddress= PairedDevices.Get(deviceList.Get(res)) 'convert the name to mac address and connect
 			serial1.Connect(ScannerMacAddress)
@@ -106,18 +106,19 @@ End Sub
 'DATA IS RECEIVED AS BYTES, CONVERT BYTES TO STRING AND CALL FUNCTION TO PROCESS
 Sub AStream_NewData (Buffer() As Byte)
 	Dim eanReceived As String = BytesToString(Buffer, 0, Buffer.Length, "UTF8")
-	CallSub2($"${act}"$, "ProcessScannedEanCode", eanReceived)
+	CallSub2($"${act}"$, "ProcessScannedCode", eanReceived)
 End Sub
 
 'WE DON'T WANT THIS TO HAPPEN
 Sub AStream_Error
 	'CallSub2(orderpickingitems, "ScannerFound", False)
-	CallSub2($"${act}"$, "ScannerFound", False)
+	CallSubDelayed2($"${act}"$, "ScannerFound", False)
+	clsFunc.createCustomToast("Fout ...", Colors.Blue)
 '	AStream.Close
 '	serial1.Disconnect
 	If ScannerOnceConnected = True Then
-		If T.IsInitialized Then
-			T.Enabled = True
+		If TimeGetDevice.IsInitialized Then
+			TimeGetDevice.Enabled = True
 		End If
 	Else
 		ShowPairedDevices
@@ -130,7 +131,7 @@ Sub AStream_Terminated
 End Sub
 
 Sub Timer_Tick
-	T.Enabled = False
+	TimeGetDevice.Enabled = False
 	serial1.Connect(ScannerMacAddress)
 	clsFunc.createCustomToast ("Verbinden met apparaat...", Colors.Blue)
 End Sub
@@ -144,7 +145,7 @@ Sub Serial_Connected (success As Boolean)
 			
 		AStream.Initialize(serial1.InputStream, serial1.OutputStream, "AStream")
 		ScannerOnceConnected = True
-		T.Enabled = False
+		TimeGetDevice.Enabled = False
 		clsFunc.createCustomToast("Scanner verbonden", Colors.Blue)
 	Else
 		If ScannerOnceConnected=False Then
@@ -154,9 +155,9 @@ Sub Serial_Connected (success As Boolean)
 			maxTriesToConnect = maxTriesToConnect + 1
 			Log($"Still waiting for the scanner to reconnect : ${ScannerMacAddress} (${maxTriesToConnect})"$)
 			If maxTriesToConnect <= 3 Then
-				T.Enabled = True
+				TimeGetDevice.Enabled = True
 			Else
-				T.Enabled = False
+				TimeGetDevice.Enabled = False
 			End If
 		End If
 	End If
