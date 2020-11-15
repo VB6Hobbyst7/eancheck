@@ -17,11 +17,20 @@ Sub Process_Globals
 	Public scannerMac, firstCodeScanned, secondCodeScanned As String
 	Public testSecondCode, eanJongensFound, eanProductFound As Boolean
 	Public scannedJongensCode, scannedProductCode As String
+	Public prodEan1, prodEan2, prodEan3 as String
 	Dim sql As SQL
+	Private streamer As AudioStreamer
+	Dim sp As SoundPool
+	Dim LoadId As Int
 End Sub
 
 Sub Service_Create
 	GetSafeFolder
+	streamer.Initialize("streamer", 8000, True, 16, streamer.VOLUME_MUSIC)
+	streamer.StartPlaying
+	sp.Initialize(1)
+	LoadId = sp.Load(File.DirAssets, "iphone_whatsapp_2016.mp3")
+'	sp.Play(LoadId, 1, 1, 1, 1, 1)
 	
 End Sub
 
@@ -47,4 +56,21 @@ Private Sub GetSafeFolder
 	folder = rp.GetAllSafeDirsExternal("")
 	
 	filePath = folder(0)
+End Sub
+
+Public Sub Beep (DurationMs As Double, Frequency As Int)
+	Dim sampleRate As Int = 8000
+	Dim numSamples As Int = sampleRate * DurationMs / 1000
+	Dim gsnd(2 * numSamples) As Byte
+	For i = 0 To numSamples - 1
+		Dim d As Double = Sin(2 * cPI * i / (sampleRate / Frequency))
+		Dim val As Short = d * 32767
+		gsnd(2 * i) = Bit.And(val, 0x00ff)
+		gsnd(2 * i + 1) = Bit.UnsignedShiftRight(Bit.And(val, 0xff00), 8)
+	Next
+	streamer.Write(gsnd)
+End Sub
+
+Public Sub PlayFound
+	sp.Play(LoadId, 1, 1, 1, 0, 1)
 End Sub
