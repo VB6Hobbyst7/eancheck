@@ -62,6 +62,95 @@ Sub ParseArticleJson As ResumableSub
 	Return True
 End Sub
 
+Sub AddItemToUnknownTable(item As productData) As List
+	DbInitialized
+	Dim artnrFound, ean1Found, ean2Found As Int = 0
+	
+	If Starter.eanJongensFound Then 
+		artnrFound = 1
+	End If
+	
+	If Starter.eanProductFound Then
+		ean1Found = 1
+	End If
+	
+	qry = $"INSERT INTO ean_not_found (id, id_from_unknown, article_number, ean_1, ean_2
+	       , ean_3, description, pack, alfa, statie, date_added, articlenr_found, ean_1_found, ean_2_found)
+			VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"$
+'	Starter.sql.ExecNonQuery2(qry, Array As String(clsFunc.UUIDv4,item.id, item.articleNr, _
+'					item.ean1, item.ean2, item.ean3, item.descr, item.pack, item.alfa, _
+'					item.statie, DateTime.Now, artnrFound, ean1Found, ean2Found))
+ 	Starter.sql.ExecNonQuery2(qry, Array As String(clsFunc.UUIDv4,item.id, Starter.scannedJongensCode, _
+					Starter.scannedProductCode, "", "", item.descr, item.pack, item.alfa, _
+					item.statie, DateTime.Now, artnrFound, ean1Found, ean2Found))
+
+
+	
+	Return GetLastAddedUnknownItem		
+					
+End Sub
+ 
+Sub GetLastAddedUnknownItem As List
+	DbInitialized
+	
+	Dim lst As List
+	Dim lastId, prodEan1, prodEan2, prodEan3 As String
+	
+	prodEan1 = Starter.prodEan1
+	prodEan2 = Starter.prodEan2
+	prodEan3 = Starter.prodEan3
+	
+	lst.Initialize
+	lastId = GetLastId
+	qry = $"SELECT * FROM ean_not_found WHERE id = ? ORDER BY date_added"$
+	
+	rs = Starter.sql.ExecQuery2(qry, Array As String(lastId))
+	If rs.IsInitialized Then
+		Do While rs.NextRow
+			lst.Add(CreateproductData(rs.GetString("id"), rs.GetString("article_number"), _
+			rs.GetString("ean_1"), prodEan2,	prodEan3, _
+			rs.GetString("description"), rs.GetString("pack"), rs.GetString("alfa"), _
+			rs.GetString("statie"),	rs.GetString("date_added"), rs.GetInt("articlenr_found"), _
+			rs.GetInt("ean_1_found"), rs.GetInt("ean_2_found")))
+		Loop
+	End If
+	
+	rs.close
+	Return lst
+ 	
+End Sub
+
+Sub GetLastId As String
+	DbInitialized
+	
+	qry = $"SELECT id FROM ean_not_found ORDER BY date_added DESC LIMIT 1;"$
+	
+	Return Starter.sql.ExecQuerySingleResult(qry)
+	
+End Sub
+
+Sub GetUnknownEanItems As List
+	DbInitialized
+	
+	Dim lst As List
+	lst.Initialize
+	qry = $"SELECT * FROM ean_not_found ORDER BY date_added"$
+	
+	rs = Starter.sql.ExecQuery(qry)
+	If rs.IsInitialized Then
+		Do While rs.NextRow
+			lst.Add(CreateproductData(rs.GetString("id"), rs.GetString("article_number"), _
+			rs.GetString("ean_1"), rs.GetString("ean_2"),	rs.GetString("ean_3"), _
+			rs.GetString("description"), rs.GetString("pack"), rs.GetString("alfa"), _
+			rs.GetString("statie"),	rs.GetString("date_added"), rs.GetInt("articlenr_found"), _
+			rs.GetInt("ean_1_found"), rs.GetInt("ean_2_found")))
+		Loop
+	End If
+	
+	rs.close
+	Return lst
+End Sub
+
 Sub GetArticleCount As Int
 	DbInitialized
 	
@@ -90,42 +179,64 @@ Private Sub vacuumDB
 	Starter.sql.ExecNonQuery("VACUUM")
 End Sub
 
-Sub ProcessScannedCode(isJongens As Boolean) As Int
+public Sub ProcessScannedCode(isJongens As Boolean) As Int
 	DbInitialized
 	
 	If isJongens Then
 		qry = "SELECT count(id) FROM article WHERE article_number = ?"
 		Return Starter.sql.ExecQuerySingleResult2(qry, Array As String(Starter.firstCodeScanned))
 	Else
-		qry = "SELECT count(id) FROM article WHERE article_number = ? Or (ean_1 = ? Or ean_2 = ? Or ean_3 = ?)"
-		Return Starter.sql.ExecQuerySingleResult2(qry, Array As String(Starter.firstCodeScanned, Starter.firstCodeScanned, Starter.firstCodeScanned, Starter.firstCodeScanned))
+		'qry = "SELECT count(id) FROM article WHERE article_number = ? Or (ean_1 = ? Or ean_2 = ? Or ean_3 = ?)"
+		qry = "SELECT count(id) FROM article WHERE (ean_1 = ? Or ean_2 = ? Or ean_3 = ?)"
+		Return Starter.sql.ExecQuerySingleResult2(qry, Array As String(Starter.firstCodeScanned, Starter.firstCodeScanned, Starter.firstCodeScanned))
 	End If
 End Sub
 
-Sub GetUnknownEanData As List
+public Sub GetUnknownEanData As List
 	DbInitialized
 	Dim lst As List
+	Dim cs As CSBuilder
+	Dim qryRun As Boolean
+	'Dim unknownText As String = cs.Initialize.Typeface(Typeface.FONTAWESOME).Color(0xFF01FF20).Size(40).Append(Chr(0xF044)).Append(" Onbekend").PopAll
 	
-	If Starter.scannedJongensCode.Length > 0 Then
+	Dim unknownText As String =  cs.Initialize.Underline.Color(0xFF00D0FF).Clickable("word", "Onbekend").Append("Onbekend").PopAll
+
+	
+	If Starter.scannedJongensCode.Length > 0 And Starter.eanJongensFound Then
 		qry = $"SELECT * FROM article where article_number = ?"$
 		rs = Starter.sql.ExecQuery2(qry, Array As String(Starter.scannedJongensCode))
+		qryRun = True
 	End If
 	
-	If Starter.scannedProductCode.Length > 0 Then
+	If Starter.scannedProductCode.Length > 0 And Starter.eanProductFound Then
 		qry = $"SELECT * FROM article where (ean_1 = ? or ean_2 = ? or ean_3 = ?)"$
 		rs = Starter.sql.ExecQuery2(qry, Array As String(Starter.scannedProductCode, Starter.scannedProductCode, Starter.scannedProductCode))
+		qryRun = True
 	End If
 	lst.Initialize
-	
-	Do While rs.NextRow
-		lst.Add(CreateproductData(rs.GetString("id"), rs.GetString("article_number"), rs.GetString("ean_1"), rs.GetString("ean_2"), rs.GetString("ean_3"), rs.GetString("description"), rs.GetString("pack"), rs.GetString("alfa"), rs.GetString("statie")))
-	Loop
-	
-	rs.close
+	If qryRun Then
+		If rs.RowCount > 0 Then
+			Do While rs.NextRow
+				lst.Add(CreateproductData(rs.GetString("id"), rs.GetString("article_number"), rs.GetString("ean_1"), _
+			rs.GetString("ean_2"), rs.GetString("ean_3"), rs.GetString("description"), rs.GetString("pack"), _
+			rs.GetString("alfa"), rs.GetString("statie"), DateTime.Now, 0, _
+			0, 0))
+			Loop
+			Log(rs.Position)
+			Starter.prodEan1 = rs.GetString("ean_1")
+			Starter.prodEan2 = rs.GetString("ean_2")
+			Starter.prodEan3 = rs.GetString("ean_3")
+			rs.close
+		End If
+	End If
+	If lst.Size = 0 Then
+		lst.Add(CreateproductData(clsFunc.UUIDv4, Starter.scannedJongensCode, Starter.scannedProductCode, "", "", unknownText, "", "", "", DateTime.Now, 0, 0, 0))
+	End If
 	Return lst
+	
 End Sub
 
-Public Sub CreateproductData (id As String, articleNr As String, ean1 As String, ean2 As String, ean3 As String, descr As String, pack As String, alfa As String, statie As String) As productData
+Public Sub CreateproductData (id As String, articleNr As String, ean1 As String, ean2 As String, ean3 As String, descr As String, pack As String, alfa As String, statie As String, dateAdded As Long, artnrFound As Int, ean1Found As Int, ean2Found As Int) As productData
 	Dim t1 As productData
 	t1.Initialize
 	t1.id = id
@@ -137,5 +248,26 @@ Public Sub CreateproductData (id As String, articleNr As String, ean1 As String,
 	t1.pack = pack
 	t1.alfa = alfa
 	t1.statie = statie
+	t1.dateAdded = dateAdded
+	t1.artnrFound = artnrFound
+	t1.ean1Found = ean1Found
+	t1.ean2Found = ean2Found
 	Return t1
+End Sub
+
+Public Sub DeleteItemFromList(id As String)
+	DbInitialized
+	qry = $"DELETE FROM ean_not_found WHERE id = ?"$
+	Starter.sql.BeginTransaction
+	Starter.sql.ExecNonQuery2(qry, Array As String(id))
+	Starter.sql.TransactionSuccessful
+	Starter.sql.EndTransaction
+End Sub
+
+'Public Sub CheckIfItemExistsInUnknownTable(id As String) As Int
+Public Sub CheckIfItemExistsInUnknownTable(article_number As String, ean_1 As String) As Int
+	DbInitialized
+	qry = $"SELECT Count(id) FROM ean_not_found WHERE id_from_unknown = ?"$
+	qry = $"SELECT Count(id) FROM ean_not_found WHERE article_number = ? and (ean_1 = ? or ean_2 = ? or ean_3 = ?)"$
+	Return Starter.sql.ExecQuerySingleResult2(qry, Array As String(article_number, ean_1))
 End Sub

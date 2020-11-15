@@ -1,18 +1,22 @@
 ﻿Build1=Default,nl.pdeg.eancheck
 File1=arial.ttf
 File2=artikel.json
-File3=eancheck.db
-File4=eancheck.png
-File5=Main.bal
-File6=materialdesignicons-webfont.ttf
-File7=pnlUnknownEAN.bal
+File3=changeUnknowDescription.bal
+File4=eancheck.db
+File5=eancheck.png
+File6=iphone_whatsapp_2016.mp3
+File7=Main.bal
+File8=materialdesignicons-webfont.ttf
+File9=pnlUnknownEAN.bal
 FileGroup1=files
 FileGroup2=files
-FileGroup3=files
+FileGroup3=Forms
 FileGroup4=files
-FileGroup5=Forms
-FileGroup6=files
+FileGroup5=files
+FileGroup6=Default Group
 FileGroup7=Forms
+FileGroup8=files
+FileGroup9=Forms
 Group=Default Group
 Library1=core
 Library10=runtimepermissions
@@ -33,7 +37,7 @@ Module3=GeneralFunctions
 Module4=GetScanner
 Module5=ImportArticleJson
 Module6=Starter
-NumberOfFiles=7
+NumberOfFiles=9
 NumberOfLibraries=12
 NumberOfModules=6
 Version=10.2
@@ -54,18 +58,23 @@ Version=10.2
 
 Sub Process_Globals
 	Type productData(id As String, articleNr As String, ean1 As String, ean2 As String, ean3 As String, _
-					 descr As String, pack As String, alfa As String, statie As String)
+					 descr As String, pack As String, alfa As String, statie As String, dateAdded As Long, _
+					 artnrFound As Int, ean1Found As Int, ean2Found As Int)
 	Private xui As XUI
 	Private clsImportJson As ImportArticleJson
-	dim beep as Beeper
+	Dim beep As Beeper
+	Private unKnownAdd As Boolean
 End Sub
 
 Sub Globals
 	'These global variables will be redeclared each time the activity is created.
+	DateTime.DateFormat="EEE, d MMM yyyy HH:mm:ss"
 	Private clsFunc As GeneralFunctions
 	Private clsDb As DbFunctions
 	Private clsScanner As GetScanner
 	Private clvUnknownEan As CustomListView
+	Private dialog As B4XDialog
+	
 	Private pnlImport As Panel
 	Private lblHeader As Label
 	Private lblEanMissing As Label
@@ -73,11 +82,18 @@ Sub Globals
 	Private lblEan1 As Label
 	Private lblEan2 As Label
 	Private lblEan3 As Label
-	Private lblOms As Label
+	Private lblOms As B4XView
 	Private pnlEan As Panel
 	Private lblPack As Label
 	Private pnlEanMissing As Panel
 	Private pnlTestEan As Panel
+	Private fltDescription As B4XFloatTextField
+	Private lblRemoveItem As Label
+	Private lblDateTimeAdded As Label
+	Private pnlRemoveItem As Panel
+	Private lblNoItemsFound As Label
+	Private lblLastScanJongens As Label
+	Private lblLastScanProduct As Label
 End Sub
 
 Sub Activity_Create(FirstTime As Boolean)
@@ -85,12 +101,13 @@ Sub Activity_Create(FirstTime As Boolean)
 	InitClasses
 	
 	Activity.LoadLayout("Main")
+	dialog.Initialize(Activity)
 	lblHeader.Text = $"EAN Controle v${Application.VersionName}"$
-	ShowEanTotalAndNotFound
-	clvUnknownEan.Clear
 	
+	clvUnknownEan.Clear
+	GetUnknownItemList
 	'GetConnected Devices
-	InitScanner
+'	InitScanner
 End Sub
 
 Private Sub InitClasses
@@ -125,8 +142,20 @@ Sub Activity_Pause (UserClosed As Boolean)
 
 End Sub
 
+Sub GetUnknownItemList
+	Dim lst As List = clsDb.GetUnknownEanItems
+	clvUnknownEan.Clear
+	
+	For Each item As productData In lst
+		GenClvItem(item)
+	Next
+	ShowEanTotalAndNotFound
+End Sub
+
 Sub ShowEanTotalAndNotFound
-	lblEanMissing.Text = $"Ean ${clsDb.GetArticleCount} waarvan ${clsDb.GetUnknownEanCount} onbekend"$
+	Dim unknownCount As Int = clsDb.GetUnknownEanCount
+	lblEanMissing.Text = $"Ean ${clsDb.GetArticleCount} waarvan ${unknownCount} onbekend"$
+	lblNoItemsFound.Visible = unknownCount < 1
 End Sub
 
 Sub CheckIfDbExists
@@ -143,42 +172,57 @@ Sub pnlImport_Click
 			ProgressDialogShow2("Artikelen bijwerken..", False)
 			Sleep(300)
 			Wait For (clsDb.PurgeArticleTable) Complete (done As Boolean)
+			Wait For (clsDb.ParseArticleJson) Complete (done As Boolean)
+			clsFunc.createCustomToast("Artikelen geïmporteerd", Colors.Blue)
+			Sleep(100)
 			ProgressDialogHide
 		End If
 	End If
-	Wait For (clsDb.ParseArticleJson) Complete (done As Boolean)
 	
-	clsFunc.createCustomToast("Artikelen geïmporteerd", Colors.Blue)
-	Sleep(100)
 	ShowEanTotalAndNotFound
 End Sub
 
 Sub GenClvItem(prodData As productData)
+	unKnownAdd = False
+	
 	If checkItemInList(prodData.id) Then Return
 	
+	
 	Dim p As B4XView = xui.CreatePanel("")
-	p.SetLayoutAnimated(0, 0dip, 0dip, clvUnknownEan.AsView.Width, 220dip)
+	Dim aDate As Long = prodData.dateAdded
+	
+	p.SetLayoutAnimated(0, 0dip, 0dip, clvUnknownEan.AsView.Width, 270dip)
 	p.LoadLayout("pnlUnknownEAN")
 	p.Tag = prodData.id
 	
+	pnlEanMissing.Tag = prodData.id
 	lblArtNr.Text = prodData.articleNr
 	lblEan1.Text = prodData.ean1
 	lblEan2.Text = prodData.ean2
 	lblEan3.Text = prodData.ean3
 	lblOms.Text = prodData.descr
 	lblPack.Text = prodData.pack
+	lblDateTimeAdded.Text = DateTime.Date(aDate)
+	
+	If prodData.artnrFound = 0 Then
+		lblArtNr.TextColor = Colors.Red
+	End If
+	If prodData.ean1Found = 0 Then
+		lblEan1.TextColor = Colors.Red
+		lblEan2.TextColor = Colors.Red
+	End If
 	
 	clvUnknownEan.Add(p, "")
-		
+	unKnownAdd = True	
 End Sub
 
 Sub checkItemInList(id As String) As Boolean
 	Dim p As Panel
+	p.Initialize("")
 	For i = 0 To clvUnknownEan.Size - 1
 		p = clvUnknownEan.GetPanel(i)
 		If p.Tag = id Then
 			beep.Initialize(250, 2500)
-			
 			Return True
 		End If
 	Next
@@ -191,8 +235,10 @@ Sub ProcessScannedCode(scannedCode As String)
 	Dim isJongens As Boolean = scannedCode.Length = 7
 		
 	If isJongens Then
+		lblLastScanJongens.Text = scannedCode
 		findJongensCode(scannedCode)
 	Else
+		lblLastScanProduct.Text	= scannedCode
 		findProuctCode(scannedCode)
 	End If
 	
@@ -200,10 +246,29 @@ Sub ProcessScannedCode(scannedCode As String)
 End Sub
 
 Sub DetermineCodeFound
-	Dim lst As List = clsDb.GetUnknownEanData'ignore
-	GenClvItem(lst.Get(0))
-	lblEanMissing.Text = $"Ean ${clsDb.GetArticleCount} waarvan ${clvUnknownEan.Size} onbekend"$
+	Dim lst As List = clsDb.GetUnknownEanData
+	Dim passedItem As productData = lst.Get(0)
 	
+	'CHECK IF ITEM EXISTS IN UNKNOWN ITEMS TABLE
+	'If clsDb.CheckIfItemExistsInUnknownTable(passedItem.articleNr, passedItem.ean1) = 0 Then
+	If clsDb.CheckIfItemExistsInUnknownTable(Starter.scannedJongensCode, Starter.scannedProductCode) = 0 Then
+		If lst.Size > 0 Then
+			'GenClvItem(lst.Get(0))
+		End If
+	
+		If unKnownAdd And lst.Size > 0 Then
+			Dim lstNewItem As List
+			lstNewItem = clsDb.AddItemToUnknownTable(lst.Get(0))
+			GenClvItem(lstNewItem.Get(0))
+			clvUnknownEan.Refresh
+			clvUnknownEan.JumpToItem(clvUnknownEan.Size-1)
+		End If
+	Else
+		Starter.PlayFound
+		clsFunc.createCustomToast("Item al in lijst", Colors.Blue)
+	End If
+	
+	ShowEanTotalAndNotFound
 End Sub
 
 Sub findJongensCode(code As String)
@@ -211,9 +276,9 @@ Sub findJongensCode(code As String)
 	Dim firstFound As Int = clsDb.ProcessScannedCode(True)
 	If firstFound = 1 Then
 		Starter.eanJongensFound = True
-		Starter.scannedJongensCode = code
-		clsFunc.createCustomToast($"Jongens code GEVONDEN"$, Colors.Blue)
+'		Starter.scannedJongensCode = code
 	End If
+	Starter.scannedJongensCode = code
 End Sub
 
 Sub findProuctCode(code As String)
@@ -221,9 +286,9 @@ Sub findProuctCode(code As String)
 	Dim isFound As Int = clsDb.ProcessScannedCode(False)
 	If isFound = 1 Then
 		Starter.eanProductFound = True
-		Starter.scannedProductCode = code
-		clsFunc.createCustomToast($"Product code GEVONDEN"$, Colors.Blue)
+'		Starter.scannedProductCode = code
 	End If
+	Starter.scannedProductCode = code
 End Sub
 
 Sub clearScanSearchVars
@@ -233,20 +298,66 @@ Sub clearScanSearchVars
 	Starter.scannedProductCode = ""
 	Starter.firstCodeScanned = ""
 	Starter.secondCodeScanned = ""
+	Starter.prodEan1 = ""
+	Starter.prodEan2 = ""
+	Starter.prodEan3 = ""
 End Sub
 
 Sub pnlTestEan_Click
-	Dim sTime As Long = DateTime.Now
 	clearScanSearchVars
-	ProcessScannedCode("5449000228354")'2
-	ProcessScannedCode("0101634")
+	ProcessScannedCode("5449000228352")'2
+	ProcessScannedCode("0101637")'4
 	If Starter.eanJongensFound = False Or Starter.eanProductFound = False Then
 		DetermineCodeFound
+	Else
+		clsFunc.createCustomToast("Item bekend", Colors.Green)	
 	End If
-	
-	Log($"Codes gevonden in ${DateTime.Now-sTime}ms"$)
+	clearScanSearchVars
 End Sub
 
-'Starter.secondCodeScanned = "5449000228352" '2
-	'	Starter.secondCodeScanned = "0101634" '2
+Sub lblOms_Click
+	Dim lbl As Label = Sender
+	If lbl.Text.IndexOf("Onbekend")= - 1 Then Return
+	
+	Dim p As B4XView = xui.CreatePanel("")
+	p.SetLayoutAnimated(0, 0, 0, 350dip, 150dip)
+	p.LoadLayout("changeUnknowDescription")
+	dialog.Title = "Nieuwe omschrijving"
+	dialog.PutAtTop = True 'put the dialog at the top of the screen
+	dialog.BackgroundColor = Colors.White
+	dialog.ButtonsColor = Colors.LightGray
+	dialog.ButtonsTextColor = Colors.Black
+	dialog.TitleBarHeight = 80dip
+	dialog.BackgroundColor = xui.Color_White
+	dialog.ButtonsColor = xui.Color_White
+	dialog.ButtonsTextColor = dialog.TitleBarColor
+	dialog.BorderColor = xui.Color_Transparent
+	
+	Wait For (dialog.ShowCustom(p, "OKE", "", "ANNULEER")) Complete (Result As Int)
+	If Result = xui.DialogResponse_Positive Then
+		Log(fltDescription.Text)
+	End If
+End Sub
 
+Sub pnlRemoveItem_Click
+	Dim pnl, pnlParent As Panel
+	Dim id As String
+	Dim index As Int
+	
+	pnl.Initialize("")
+	pnlParent.Initialize("")
+	pnl = Sender
+	pnlParent = pnl.Parent
+	id = pnlParent.Tag
+	index = clvUnknownEan.GetItemFromView(pnlParent)
+	
+	Msgbox2Async("Item verwijderen?", "EAN Checker", "Ja", "", "Nee", Application.Icon, False)
+	Wait For Msgbox_Result (Result As Int)
+	If Result = DialogResponse.NEGATIVE Then
+		Return
+	End If
+	
+	clsDb.DeleteItemFromList(id)
+	clvUnknownEan.RemoveAt(index)
+	ShowEanTotalAndNotFound
+End Sub
