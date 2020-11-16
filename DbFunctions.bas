@@ -21,6 +21,44 @@ Private Sub DbInitialized
 	End If
 End Sub
 
+Sub ParseArticleCsv(csvList As List) As ResumableSub
+	DbInitialized
+	
+	Dim mArtnr, recId As String
+
+	Sleep(400)
+	
+	
+	qry = $"INSERT INTO article (id, article_number, ean_1, ean_2, ean_3, description, pack, alfa, statie)
+			VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)"$
+	
+	
+	Starter.sql.BeginTransaction
+	For Each item As List In csvList
+		Dim itemData As productDataCsv = item
+'		Dim ean1 As String = colartikelen.Get("ean1")
+'		Dim oms As String = colartikelen.Get("oms")
+'		Dim artnr As Int = colartikelen.Get("artnr")
+'		Dim alfa As String = colartikelen.Get("alfa")
+'		Dim pack As String = colartikelen.Get("pack")
+'		Dim statie As Int = colartikelen.Get("statie")
+'		Dim ean3 As String = colartikelen.Get("ean3")
+'		Dim ean2 As String = colartikelen.Get("ean2")
+		
+'		mArtnr = artnr
+'		If mArtnr.Length < 7 Then
+'			mArtnr = $"0${mArtnr}"$
+'		End If
+'		
+'		recId = clsFunc.UUIDv4
+'		Starter.sql.ExecNonQuery2(qry, Array As String(recId, mArtnr, ean1, ean2, ean3, oms, pack, alfa, statie))
+	Next
+
+	Starter.sql.TransactionSuccessful
+	Starter.sql.EndTransaction
+	Return True
+End Sub
+
 Sub ParseArticleJson As ResumableSub
 	DbInitialized
 	

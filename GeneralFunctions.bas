@@ -299,3 +299,11 @@ Sub SetButtonColors(pnl As Activity)
 	Next
 	
 End Sub
+
+Sub ImportCsv
+'	Dim csv As List
+'	Dim su As StringUtils
+'	
+'	csv = su.LoadCSV(File.DirAssets, "data.csv", ",")
+	
+End Sub
