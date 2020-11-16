@@ -22,6 +22,8 @@ Library1=core
 Library10=runtimepermissions
 Library11=json
 Library12=sql
+Library13=net
+Library14=stringutils
 Library2=xui
 Library3=jmqtt
 Library4=randomaccessfile
@@ -31,15 +33,16 @@ Library7=xui views
 Library8=phone
 Library9=accessibility
 ManifestCode='This code will be applied to the manifest file during compilation.~\n~'You do not need to modify it in most cases.~\n~'See this link for for more information: https://www.b4x.com/forum/showthread.php?p=78136~\n~AddManifestText(~\n~<uses-sdk android:minSdkVersion="14" android:targetSdkVersion="29"/>~\n~<supports-screens android:largeScreens="true" ~\n~    android:normalScreens="true" ~\n~    android:smallScreens="true" ~\n~    android:anyDensity="true"/>)~\n~SetApplicationAttribute(android:icon, "@drawable/icon")~\n~SetApplicationAttribute(android:label, "$LABEL$")~\n~CreateResourceFromFile(Macro, Themes.LightTheme)~\n~'End of default text.~\n~
-Module1=ClassMqtt
-Module2=DbFunctions
-Module3=GeneralFunctions
-Module4=GetScanner
-Module5=ImportArticleJson
-Module6=Starter
+Module1=ClassFtp
+Module2=ClassMqtt
+Module3=DbFunctions
+Module4=GeneralFunctions
+Module5=GetScanner
+Module6=ImportArticleJson
+Module7=Starter
 NumberOfFiles=9
-NumberOfLibraries=12
-NumberOfModules=6
+NumberOfLibraries=14
+NumberOfModules=7
 Version=10.2
 @EndOfDesignText@
 #Region  Project Attributes 
@@ -60,6 +63,11 @@ Sub Process_Globals
 	Type productData(id As String, articleNr As String, ean1 As String, ean2 As String, ean3 As String, _
 					 descr As String, pack As String, alfa As String, statie As String, dateAdded As Long, _
 					 artnrFound As Int, ean1Found As Int, ean2Found As Int)
+					 
+	Type productDataCsv(id As String, articleNr As String, verpakking As String, inhoud As String, eenheid As String, _
+					    descr As String, statiegeld As String, artnr_lev As String, locatie As String, voorraad As String, _
+					    ean1 As String, ean2 As String, ean3 As String,dateAdded As Long)
+					 				 
 	Private xui As XUI
 	Private clsImportJson As ImportArticleJson
 	Dim beep As Beeper
@@ -69,6 +77,7 @@ End Sub
 Sub Globals
 	'These global variables will be redeclared each time the activity is created.
 	DateTime.DateFormat="EEE, d MMM yyyy HH:mm:ss"
+	Private clsFtp As ClassFtp
 	Private clsFunc As GeneralFunctions
 	Private clsDb As DbFunctions
 	Private clsScanner As GetScanner
@@ -103,7 +112,7 @@ Sub Activity_Create(FirstTime As Boolean)
 	Activity.LoadLayout("Main")
 	dialog.Initialize(Activity)
 	lblHeader.Text = $"EAN Controle v${Application.VersionName}"$
-	
+	clsFtp.DownloadAndProcessOrder("998")
 	clvUnknownEan.Clear
 	GetUnknownItemList
 	'GetConnected Devices
@@ -115,6 +124,7 @@ Private Sub InitClasses
 	clsDb.Initialize
 	clsFunc.Initialize
 	clsScanner.Initialize("Main")
+	clsFtp.Initialize
 End Sub
 
 Sub InitScanner
@@ -212,7 +222,8 @@ Sub GenClvItem(prodData As productData)
 		lblEan2.TextColor = Colors.Red
 	End If
 	
-	clvUnknownEan.Add(p, "")
+	clvUnknownEan.InsertAt(0, p, "")
+'	clvUnknownEan.Add(p, "")
 	unKnownAdd = True	
 End Sub
 
@@ -253,7 +264,7 @@ Sub DetermineCodeFound
 	'If clsDb.CheckIfItemExistsInUnknownTable(passedItem.articleNr, passedItem.ean1) = 0 Then
 	If clsDb.CheckIfItemExistsInUnknownTable(Starter.scannedJongensCode, Starter.scannedProductCode) = 0 Then
 		If lst.Size > 0 Then
-			'GenClvItem(lst.Get(0))
+			GenClvItem(lst.Get(0))
 		End If
 	
 		If unKnownAdd And lst.Size > 0 Then
@@ -261,7 +272,9 @@ Sub DetermineCodeFound
 			lstNewItem = clsDb.AddItemToUnknownTable(lst.Get(0))
 			GenClvItem(lstNewItem.Get(0))
 			clvUnknownEan.Refresh
-			clvUnknownEan.JumpToItem(clvUnknownEan.Size-1)
+			If clvUnknownEan.Size > 0 Then
+				clvUnknownEan.JumpToItem(0)
+			End If
 		End If
 	Else
 		Starter.PlayFound
@@ -306,7 +319,7 @@ End Sub
 Sub pnlTestEan_Click
 	clearScanSearchVars
 	ProcessScannedCode("5449000228352")'2
-	ProcessScannedCode("0101637")'4
+	ProcessScannedCode("0101630")'4
 	If Starter.eanJongensFound = False Or Starter.eanProductFound = False Then
 		DetermineCodeFound
 	Else

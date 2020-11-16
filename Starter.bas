@@ -17,7 +17,10 @@ Sub Process_Globals
 	Public scannerMac, firstCodeScanned, secondCodeScanned As String
 	Public testSecondCode, eanJongensFound, eanProductFound As Boolean
 	Public scannedJongensCode, scannedProductCode As String
-	Public prodEan1, prodEan2, prodEan3 as String
+	Public prodEan1, prodEan2, prodEan3 As String
+	Public ftpServer, ftpUserName, FtpPassword, pickerId As String
+	Public filePath, ftpFolder As String
+	Public ftpPort, SelectedOrderIndex As Int
 	Dim sql As SQL
 	Private streamer As AudioStreamer
 	Dim sp As SoundPool
@@ -28,6 +31,7 @@ Sub Service_Create
 	GetSafeFolder
 	streamer.Initialize("streamer", 8000, True, 16, streamer.VOLUME_MUSIC)
 	streamer.StartPlaying
+	SetFtpData
 	sp.Initialize(1)
 	LoadId = sp.Load(File.DirAssets, "iphone_whatsapp_2016.mp3")
 '	sp.Play(LoadId, 1, 1, 1, 1, 1)
@@ -73,4 +77,12 @@ End Sub
 
 Public Sub PlayFound
 	sp.Play(LoadId, 1, 1, 1, 0, 1)
+End Sub
+
+Private Sub SetFtpData
+	ftpServer = "dev.distridata.nl"
+	ftpUserName = "ftp_youwe_zegro"
+	FtpPassword = "Y0uw3FTP_2o19@"
+	ftpPort = 21
+	
 End Sub
